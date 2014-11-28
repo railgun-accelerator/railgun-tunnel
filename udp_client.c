@@ -19,14 +19,14 @@ static void* udp_client_test(void* param) {
         perror("connect error");
         exit(1);
     }
-    sprintf(sendbuf, "%d%d%s", 1, 2, "HelloWorld!");
+    sprintf(sendbuf, "%d%d%s", 1258, 4578, "HelloWorld!");
     write(sock_fd, sendbuf, strlen(sendbuf));
     
     nbytes = read(sock_fd, recvbuf, MAXBUF);
     if (nbytes < 0) {
         perror("read error");
     }
-    printf("recv %s from server on thread %ld\n", recvbuf, pthread_self());
+    printf("recv %s  %dfrom server on thread %ld \n", recvbuf, nbytes, pthread_self());
     
     close(sock_fd);
     pthread_exit(NULL);
@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     
     /*check args*/
     if (argc != 2) {
-        printf("usage: udpclient <addr>\n");
+        printf("usage: udpclient <addr> \n");
         exit(1);
     }
     

@@ -37,9 +37,10 @@
           printf("socket %d recv from %s:%d message: %s, %d bytes\n",
            new_fd, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), recvbuf, ret);
      }
-     memcpy(sendbuf, recvbuf, 2 * sizeof(int));
+     memcpy(sendbuf, recvbuf, sizeof(uint32_t));
+     memcpy(&sendbuf[4], recvbuf, sizeof(uint32_t));
      
-     ret = sendto(new_fd, sendbuf, 2 * sizeof(int), 0, (struct sockaddr*)&client_addr, cli_len);
+     ret = sendto(new_fd, sendbuf, 2 * sizeof(uint32_t), 0, (struct sockaddr*)&client_addr, cli_len);
      
      if (ret < 0) {
          printf("send message error: %s", strerror(errno));
