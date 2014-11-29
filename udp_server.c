@@ -1,4 +1,5 @@
-#include "udp_server.h"
+#include <udp_server.h>
+#include <utils.h>
 
 /**
  * set non blocking
@@ -16,8 +17,8 @@
  * handle message
  */
  void* pthread_handle_message(int* sock_fd) {
-     char recvbuf[MAXBUF + 1];
      char sendbuf[MAXBUF + 1];
+     PAYLOAD_PACKET packet;
      int ret;
      int new_fd;
      
@@ -27,18 +28,19 @@
      new_fd = *sock_fd;
      
      /*start handle*/
-     bzero(recvbuf, MAXBUF + 1);
+     bzero(&packet, sizeof(PAYLOAD_PACKET));
      bzero(sendbuf, MAXBUF + 1);
      
      /*recv client message*/
      
-     ret = recvfrom(new_fd, recvbuf, MAXBUF, 0, (struct sockaddr*)&client_addr, &cli_len);
+     ret = recvfrom(new_fd, &packet, sizeof(PAYLOAD_PACKET), 0, (struct sockaddr*)&client_addr, &cli_len);
      if (ret > 0) {
-          printf("socket %d recv from %s:%d message: %s, %d bytes\n",
-           new_fd, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), recvbuf, ret);
+          printf("socket %d recv from %s:%d message: %d bytes\n",
+           new_fd, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), ret);
      }
-     memcpy(sendbuf, recvbuf, sizeof(uint32_t));
-     memcpy(&sendbuf[4], recvbuf, sizeof(uint32_t));
+     //payload_ntohl(&packet);
+     memcpy(sendbuf, &packet, sizeof(uint32_t));
+     memcpy(&sendbuf[4], &packet, sizeof(uint32_t));
      
      ret = sendto(new_fd, sendbuf, 2 * sizeof(uint32_t), 0, (struct sockaddr*)&client_addr, cli_len);
      
@@ -50,10 +52,8 @@
  }
  
  int main(int argc, char** argv) {
-     int listen_fd, kdp_fd, nfds, n, curfds;
-     socklen_t len;
-     struct sockaddr_in my_addr, their_addr;
-     unsigned int myport;
+     int listen_fd, kdp_fd, nfds, n;
+     struct sockaddr_in my_addr;
      struct epoll_event ev;
      struct epoll_event events[MAXEPOLLSIZE];
      struct rlimit rt;
@@ -92,7 +92,6 @@
      
      /*create epoll handle, add listen socket to epoll set*/
      kdp_fd = epoll_create(MAXEPOLLSIZE);
-     len = sizeof(struct sockaddr_in);
      ev.events = EPOLLIN|EPOLLET;
      ev.data.fd = listen_fd;
      if (epoll_ctl(kdp_fd, EPOLL_CTL_ADD, listen_fd, &ev) < 0) {
