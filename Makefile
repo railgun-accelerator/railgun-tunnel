@@ -3,13 +3,30 @@ TARGET_SERVER = udp_server
 TARGET_CLIENT = udp_client
 
 INCLUDE := -I./include
-CFLAGS := -Wall -g -O2 $(INCLUDE)
-LDFLAGS := -pthread
+CFLAGS := -Wall $(INCLUDE)
+LDFLAGS := -lrt
 
-objects := utils.o udp_client.o udp_server.o
+ifeq ($(RELEASE),1)
+    CFLAGS += -O3 -DNDEBUG
+else
+    CFLAGS += -g
+endif
 
-object_server := utils.o udp_server.o
-object_client := utils.o udp_client.o
+ifeq ($(BITS),32)
+    CFLAGS += -m32
+    LFLAGS += -m32
+else
+    ifeq ($(BITS),64)
+        CFLAGS += -m64
+        LFLAGS += -m64
+    else
+    endif
+endif
+
+objects := railgun_timer.o railgun_output.o railgun_utils.o railgun_client.o railgun_server.o
+
+object_server := railgun_utils.o railgun_server.o
+object_client := railgun_utils.o railgun_timer.o railgun_output.o railgun_client.o 
 
 .PHONY:all
 all:$(TARGET_SERVER) $(TARGET_CLIENT)
