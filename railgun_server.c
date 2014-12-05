@@ -7,7 +7,9 @@
 #include <railgun_server.h>
 #include <railgun_utils.h>
 
-PAYOAD_RESP resp_head;
+RESP_HEADER resp_head;
+
+static u_int32_t g_seq = ISN, g_ack = ISN;
 
 int main(int argc, char** argv) {
 	int listen_fd, kdp_fd, nfds, n, ret;
@@ -15,8 +17,9 @@ int main(int argc, char** argv) {
 	struct epoll_event ev;
 	struct epoll_event events[MAXSERVEREPOLLSIZE];
 	struct rlimit rt;
-	char sendbuf[MAXBUF + 1];
-	PAYLOAD_PACKET packet;
+	u_int8_t sendbuf[MAXBUF];
+	u_int8_t recvbuf[MAXBUF];
+	PAYLOAD_HEADER packet;
 
 	/*set max opend fd*/
 	rt.rlim_max = rt.rlim_cur = MAXSERVEREPOLLSIZE;
@@ -35,7 +38,8 @@ int main(int argc, char** argv) {
 	int opt = SO_REUSEADDR;
 	setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	set_non_blocking(listen_fd);
-	bzero(&sendbuf, MAXBUF + 1);
+	bzero(sendbuf, MAXBUF);
+	bzero(recvbuf, MAXBUF);
 	bzero(&my_addr, sizeof(struct sockaddr_in));
 	my_addr.sin_family = PF_INET;
 	my_addr.sin_port = htons(SERV_PORT);
@@ -47,7 +51,7 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 
-	bzero(&resp_head, sizeof(PAYOAD_RESP));
+	bzero(&resp_head, sizeof(RESP_HEADER));
 	INIT_LIST_HEAD(&resp_head.head);
 
 	/*create epoll handle, add listen socket to epoll set*/
@@ -69,7 +73,7 @@ int main(int argc, char** argv) {
 		for (n = 0; n < nfds; ++n) {
 			if ((events[n].events & EPOLLERR) || (events[n].events & EPOLLHUP)
 					|| (!((events[n].events & EPOLLIN)
-							|| events[n].events & EPOLLOUT))) {
+							|| (events[n].events & EPOLLOUT)))) {
 				perror("epoll error\n");
 				close(events[n].data.fd);
 				continue;
@@ -77,7 +81,7 @@ int main(int argc, char** argv) {
 					&& (events[n].events & EPOLLIN)) {
 				struct sockaddr_in client_addr;
 				socklen_t cli_len = sizeof(client_addr);
-				ret = recvfrom(listen_fd, &packet, sizeof(PAYLOAD_PACKET), 0,
+				ret = recvfrom(listen_fd, &packet, sizeof(PAYLOAD_HEADER), 0,
 						(struct sockaddr*) &client_addr, &cli_len);
 				//payload_ntohl(&packet);
 				memcpy(sendbuf, &packet, sizeof(uint32_t));
@@ -92,7 +96,7 @@ int main(int argc, char** argv) {
 						(struct sockaddr*) &client_addr, cli_len);
 				if (ret < 0) {
 					if (errno == EAGAIN) {
-						PAYOAD_RESP* resp = resp_queue_add(*(u_int32_t*)sendbuf,  &client_addr);
+						RESP_HEADER* resp = resp_queue_add(*(u_int32_t*)sendbuf,  &client_addr);
 						printf("send message pending: %u",
 								ntohl(*(u_int32_t*) resp));
 						ev.events = EPOLLOUT;
@@ -122,7 +126,7 @@ int main(int argc, char** argv) {
 					}
 					continue;
 				} else {
-					PAYOAD_RESP* resp = resp_queue_begin();
+					RESP_HEADER* resp = resp_queue_begin();
 					sendto(listen_fd, resp, 2 * sizeof(uint32_t), 0,
 							(struct sockaddr*) &resp->addr, sizeof(resp->addr));
 					resp_queue_delete(resp);

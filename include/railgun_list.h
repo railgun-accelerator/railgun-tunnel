@@ -1,3 +1,10 @@
+/*
+ * railgun_list.h
+ *
+ *  Created on: 2014年12月3日
+ *      Author: mabin
+ */
+
 #ifndef RAILGUN_LIST_H_
 #define RAILGUN_LIST_H_
 

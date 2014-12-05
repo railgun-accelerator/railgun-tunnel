@@ -14,11 +14,9 @@ endif
 
 ifeq ($(BITS),32)
     CFLAGS += -m32
-    LFLAGS += -m32
 else
     ifeq ($(BITS),64)
         CFLAGS += -m64
-        LFLAGS += -m64
     else
     endif
 endif
