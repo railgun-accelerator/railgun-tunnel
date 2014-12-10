@@ -9,10 +9,6 @@
 
 #include <railgun_list.h>
 
-#define MTU (u_int16_t)1500 - 20 - 8
-
-#define SACK_PAYLOAD_SIZE 1456
-
 typedef struct sack_packet {
 	u_int32_t left_edge;
 	u_int32_t right_edge;
@@ -27,8 +23,8 @@ typedef struct railgun_header {
     	u_int64_t _data_offset;
     	void* _data;
     } __src_represent;
-#define data_offset __src_represent._data_offset
-#define data __src_represent._data
+#define railgun_data_offset __src_represent._data_offset
+#define railgun_data __src_represent._data
     u_int32_t seq;
     u_int32_t ack;
     u_int32_t sack_cnt;

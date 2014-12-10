@@ -12,10 +12,10 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 	PAYLOAD_HEADER header;
 	u_int8_t* tmp_buf = buffer;
 	int nbytes = MTU - 3 * sizeof(u_int32_t);
-	memcpy(&header, railgun_payload(packet), sizeof(PAYLOAD_HEADER));
+	memcpy(&header, railgun_payload_header(packet), sizeof(PAYLOAD_HEADER));
 	payload_htonl(&header);
 	bzero(buffer, MAXBUF);
-	memcpy(tmp_buf, &header, sizeof(u_int32_t));
+	memcpy(tmp_buf, &header, 3 * sizeof(u_int32_t));
 	tmp_buf += 3 * sizeof(u_int32_t);
 	if (packet->sack_cnt != 0) {
 		int i = 0;
@@ -33,11 +33,11 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 	if (packet->src == 0) {
 		memcpy(tmp_buf, payload, nbytes);
 	} else {
-		memcpy(tmp_buf, packet->data, nbytes);
+		memcpy(tmp_buf, packet->railgun_data, nbytes);
 	}
 	nbytes = 0;
 	while (nbytes < MTU) {
-		int write_cnt = write(fd, &buffer, MTU);
+		int write_cnt = write(fd, buffer, MTU);
 		if (write_cnt < 0) {
 			if (errno != EAGAIN) {
 				perror("write error");
@@ -48,5 +48,37 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 	}
 	printf("send %d to server, seq = %d  \n", nbytes, packet->seq);
 	return nbytes;
+}
+
+void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer) {
+	PAYLOAD_HEADER* pheader = railgun_resp_header(resp);
+	u_int8_t* tmp_buf = buffer;
+
+	payload_htonl(pheader);
+	bzero(buffer, MAXBUF);
+
+	memcpy(tmp_buf, pheader, 3 * sizeof(u_int32_t));
+	tmp_buf += 3 * sizeof(u_int32_t);
+
+	int sack_cnt = ntohl(pheader->sack_cnt);
+
+	if (sack_cnt != 0) {
+		int i = 0;
+		for (; i < sack_cnt; i++) {
+			memcpy(tmp_buf, list_entry(&pheader->sack_head, SACK_PACKET, head),
+					2 * sizeof(u_int32_t));
+			tmp_buf += 2 * sizeof(u_int32_t);
+		}
+	}
+
+	int write_cnt = sendto(fd, buffer, tmp_buf - buffer, 0,
+			(struct sockaddr *) &resp->addr, sizeof(resp->addr));
+	if (write_cnt < 0) {
+		if (errno != EAGAIN) {
+			perror("write error");
+		}
+	}
+	printf("send %d to %s:%d, ack = %d  \n", write_cnt, inet_ntoa(resp->addr.sin_addr),
+			ntohs(resp->addr.sin_port), ntohl(resp->ack));
 }
 

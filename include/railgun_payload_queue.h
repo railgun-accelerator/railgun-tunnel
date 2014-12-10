@@ -24,12 +24,12 @@ static inline RAILGUN_HEADER* payload_queue_add(int seq, int ack,
 	RAILGUN_HEADER* packet = (RAILGUN_HEADER*) malloc(sizeof(RAILGUN_HEADER));
 	bzero(packet, sizeof(RAILGUN_HEADER));
 	packet->seq = seq;
-	packet->ack = 1;
+	packet->ack = ack;
 	packet->timestamp = time;
 	packet->src = 0;
 	packet->sack_cnt = 0;
 	INIT_LIST_HEAD(&packet->sack_head);
-	packet->data_offset = offset;
+	packet->railgun_data_offset = offset;
 	_list_add(&packet->head, &payload_head.head);
 	return packet;
 }

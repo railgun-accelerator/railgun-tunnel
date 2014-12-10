@@ -6,20 +6,57 @@
  */
 #include <railgun_server.h>
 #include <railgun_utils.h>
+#include <railgun_sack.h>
 
 RESP_HEADER resp_head;
+SACK_PACKET sack_head;
 
 static u_int32_t g_seq = ISN, g_ack = ISN;
+static BOOL g_timer_counter = 0;
+
+static int g_listen_fd = 0, g_kdp_fd = 0;
+
+typedef struct ato_event {
+	struct epoll_event* pev;
+	struct sockaddr_in addr;
+	size_t addr_len;
+} ATO_EVENT;
+
+static void ato_handler(int sig, siginfo_t *si, void *uc) {
+	ATO_EVENT* pato_ev;
+	pato_ev = (ATO_EVENT*) si->si_value.sival_ptr;
+	RESP_HEADER* packet = (RESP_HEADER*) malloc(sizeof(RESP_HEADER));
+	bzero(packet, sizeof(RAILGUN_HEADER));
+	packet->ack = g_ack;
+	packet->seq = g_seq;
+	packet->sack_cnt = sack_queue_size();
+	packet->addr_len = pato_ev->addr_len;
+	memcpy(&packet->addr, &pato_ev->addr, packet->addr_len);
+	struct list_head *iter_sack_head = NULL;
+	list_for_each_prev(iter_sack_head, &sack_head.head)
+	{
+		_list_add(iter_sack_head, &packet->sack_head);
+	}
+	resp_queue_add(packet);
+
+	pato_ev->pev->events = EPOLLIN | EPOLLOUT;
+	int ret = epoll_ctl(g_kdp_fd, EPOLL_CTL_MOD, g_listen_fd, pato_ev->pev);
+	if (ret < 0) {
+		perror("epoll_ctl add output watch failed");
+	}
+	free(pato_ev);
+	g_timer_counter = FALSE;
+}
 
 int main(int argc, char** argv) {
-	int listen_fd, kdp_fd, nfds, n, ret;
+	int nfds, n;
 	struct sockaddr_in my_addr;
 	struct epoll_event ev;
 	struct epoll_event events[MAXSERVEREPOLLSIZE];
 	struct rlimit rt;
 	u_int8_t sendbuf[MAXBUF];
 	u_int8_t recvbuf[MAXBUF];
-	PAYLOAD_HEADER packet;
+	RESP_HEADER header;
 
 	/*set max opend fd*/
 	rt.rlim_max = rt.rlim_cur = MAXSERVEREPOLLSIZE;
@@ -29,15 +66,15 @@ int main(int argc, char** argv) {
 	}
 
 	/*start listen*/
-	if ((listen_fd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
+	if ((g_listen_fd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket create failed !");
 		exit(1);
 	}
 
 	/*set socket opt, port reusable*/
 	int opt = SO_REUSEADDR;
-	setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-	set_non_blocking(listen_fd);
+	setsockopt(g_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	set_non_blocking(g_listen_fd);
 	bzero(sendbuf, MAXBUF);
 	bzero(recvbuf, MAXBUF);
 	bzero(&my_addr, sizeof(struct sockaddr_in));
@@ -45,27 +82,32 @@ int main(int argc, char** argv) {
 	my_addr.sin_port = htons(SERV_PORT);
 	my_addr.sin_addr.s_addr = INADDR_ANY;
 
-	if (bind(listen_fd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr))
+	if (bind(g_listen_fd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr))
 			== -1) {
 		perror("bind failed!");
 		exit(1);
 	}
 
 	bzero(&resp_head, sizeof(RESP_HEADER));
+	bzero(&sack_head, sizeof(SACK_PACKET));
 	INIT_LIST_HEAD(&resp_head.head);
+	INIT_LIST_HEAD(&sack_head.head);
 
 	/*create epoll handle, add listen socket to epoll set*/
-	kdp_fd = epoll_create(MAXSERVEREPOLLSIZE);
+	g_kdp_fd = epoll_create(MAXSERVEREPOLLSIZE);
 	ev.events = EPOLLIN;
-	ev.data.fd = listen_fd;
-	if (epoll_ctl(kdp_fd, EPOLL_CTL_ADD, listen_fd, &ev) < 0) {
+	ev.data.fd = g_listen_fd;
+	if (epoll_ctl(g_kdp_fd, EPOLL_CTL_ADD, g_listen_fd, &ev) < 0) {
 		fprintf(stderr, "epoll set input event listen error: fd = %d/n",
-				listen_fd);
+				g_listen_fd);
 	}
 
 	while (1) {
-		nfds = epoll_wait(kdp_fd, events, 10000, -1);
+		nfds = epoll_wait(g_kdp_fd, events, 10000, -1);
 		if (nfds == -1) {
+			if (errno == EINTR) {
+				continue;
+			}
 			perror("epoll_wait");
 			break;
 		}
@@ -77,64 +119,66 @@ int main(int argc, char** argv) {
 				perror("epoll error\n");
 				close(events[n].data.fd);
 				continue;
-			} else if (events[n].data.fd == listen_fd
+			} else if (events[n].data.fd == g_listen_fd
 					&& (events[n].events & EPOLLIN)) {
-				struct sockaddr_in client_addr;
-				socklen_t cli_len = sizeof(client_addr);
-				ret = recvfrom(listen_fd, &packet, sizeof(PAYLOAD_HEADER), 0,
-						(struct sockaddr*) &client_addr, &cli_len);
-				//payload_ntohl(&packet);
-				memcpy(sendbuf, &packet, sizeof(uint32_t));
-				memcpy((sendbuf + 4), &packet, sizeof(uint32_t));
-				if (ret > 0) {
-					printf("socket %d recv from %s:%d message: %d bytes, ack = %d, \n",
-							listen_fd, inet_ntoa(client_addr.sin_addr),
-							ntohs(client_addr.sin_port), ret, ntohl(*(u_int32_t*)sendbuf));
-				}
-
-				ret = sendto(listen_fd, sendbuf, 2 * sizeof(uint32_t), 0,
-						(struct sockaddr*) &client_addr, cli_len);
-				if (ret < 0) {
-					if (errno == EAGAIN) {
-						RESP_HEADER* resp = resp_queue_add(*(u_int32_t*)sendbuf,  &client_addr);
-						printf("send message pending: %u",
-								ntohl(*(u_int32_t*) resp));
-						ev.events = EPOLLOUT;
-						if (epoll_ctl(kdp_fd, EPOLL_CTL_MOD, listen_fd, &ev)
-								< 0) {
-							fprintf(stderr,
-									"epoll set output event listen error: fd = %d/n",
-									listen_fd);
+				int payload_offset;
+				bzero(&header, sizeof(RESP_HEADER));
+				header.addr_len = sizeof(header.addr);
+				int read_size = railgun_packet_read(g_listen_fd, recvbuf,
+						&header);
+				//test if we need to allocate memory for sack in payload first.
+				int seq = ntohl(*(u_int32_t*) recvbuf);
+				if (g_ack == seq) {
+					//do not allocate memory for sack list.
+					railgun_resp_allocate(recvbuf, &header, &payload_offset, 0);
+					g_ack += (read_size - payload_offset);
+					if (!is_sack_queue_empty) {
+						SACK_PACKET* psack = sack_queue_begin();
+						if (psack->left_edge == g_ack) {
+							g_ack = psack->right_edge;
+							sack_queue_delete(psack);
 						}
-					} else {
-						printf("send message error: %s", strerror(errno));
 					}
 				} else {
-					printf("socket %d send response %s:%d message: %d bytes, ack = %d, \n",
-												listen_fd, inet_ntoa(client_addr.sin_addr),
-												ntohs(client_addr.sin_port), ret, ntohl(*(u_int32_t*)sendbuf));
-					fflush(stdout);
+					//do allocate memory for sack list.
+					railgun_resp_allocate(recvbuf, &header, &payload_offset, 1);
+					SACK_PACKET *psack = NULL, *tmp = NULL;
+					list_for_each_prev_entry_safe(psack, tmp, &(header.sack_head), head)
+					{
+						sack_queue_combine(psack);
+					}
 				}
-			} else if (events[n].data.fd == listen_fd
+				if (g_timer_counter == FALSE) {
+					ATO_EVENT *pevent = (ATO_EVENT *) malloc(sizeof(ATO_EVENT));
+					bzero(pevent, sizeof(ATO_EVENT));
+					pevent->addr_len = header.addr_len;
+					pevent->pev = &ev;
+					memcpy(&pevent->addr, &header.addr, pevent->addr_len);
+					railgun_timer_init(ato_handler, (void*) pevent);
+					railgun_timer_set(ATO);
+					g_timer_counter = TRUE;
+				}
+			} else if (events[n].data.fd == g_listen_fd
 					&& (events[n].events & EPOLLOUT)) {
 				if (is_resp_queue_empty) {
 					ev.events = EPOLLIN;
-					if (epoll_ctl(kdp_fd, EPOLL_CTL_MOD, listen_fd, &ev) < 0) {
+					if (epoll_ctl(g_kdp_fd, EPOLL_CTL_MOD, g_listen_fd, &ev)
+							< 0) {
 						fprintf(stderr,
 								"epoll remove output event listen error: fd = %d/n",
-								listen_fd);
+								g_listen_fd);
 					}
 					continue;
 				} else {
 					RESP_HEADER* resp = resp_queue_begin();
-					sendto(listen_fd, resp, 2 * sizeof(uint32_t), 0,
-							(struct sockaddr*) &resp->addr, sizeof(resp->addr));
+					railgun_resp_send(resp, g_listen_fd, sendbuf);
 					resp_queue_delete(resp);
 				}
 			}
 		}
 	}
 
-	close(listen_fd);
-	return 0;
+	close(g_listen_fd);
+	close(g_kdp_fd);
+	exit(0);
 }

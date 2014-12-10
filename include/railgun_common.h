@@ -30,11 +30,11 @@
 #define MAXSERVEREPOLLSIZE 100
 #define MAXCLIENTEPOLLSIZE 10
 
+#define MTU (u_int16_t)1500 - 20 - 8
+
 #define SERV_PORT 41234
 
-#define MIN_DELAY_ACK (u_int16_t)100
-
-#define MAX_DELAY_ACK (u_int16_t)200
+#define ATO (u_int16_t)200
 
 #define RTO (u_int16_t)500
 
@@ -60,6 +60,12 @@ extern void railgun_timer_init(void (*timer_handler)(int sig, siginfo_t *si, voi
 extern int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 		u_int8_t *payload, int *plength);
 
-extern int railgun_packet_read(u_int8_t *buffer);
+extern int railgun_packet_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader);
+
+extern void railgun_resp_allocate(u_int8_t *buffer, RESP_HEADER *pheader, int *payload_pos, int ack_allocated);
+
+extern void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer);
+
+extern int railgun_resp_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader);
 
 #endif /*RAILGUN_COMMON_H_*/

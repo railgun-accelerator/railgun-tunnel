@@ -68,4 +68,3 @@ void railgun_timer_cancel() {
 		timer_settime(s_timer_id, 0, &it, NULL);
 	}
 }
-

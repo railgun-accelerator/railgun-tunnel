@@ -7,6 +7,9 @@
 #include <railgun_common.h>
 #include <railgun_utils.h>
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+
 int set_non_blocking(int sockfd) {
     if (fcntl(sockfd, F_SETFL,
         fcntl(sockfd, F_GETFD, 0) | O_NONBLOCK) == -1) {
@@ -16,13 +19,13 @@ int set_non_blocking(int sockfd) {
 }
 
 int map_from_file(const char* filename, void ** pdata_buffer,
-		int *plength) {
-	int data_fd = open(argv[2], O_RDONLY);
+		u_int64_t *plength) {
+	int data_fd = open(filename, O_RDONLY);
 	if (data_fd < 0) {
 		printf("open data file failed : %s", strerror(errno));
 		return -1;
 	}
-	filelength = lseek(data_fd, 1, SEEK_END);
+	*plength = lseek(data_fd, 1, SEEK_END);
 	lseek(data_fd, 0, SEEK_SET);
 	*pdata_buffer = mmap(NULL, *plength, PROT_READ, MAP_PRIVATE,
 			data_fd, 0);

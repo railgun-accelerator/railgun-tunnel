@@ -21,10 +21,10 @@ else
     endif
 endif
 
-objects := railgun_timer.o railgun_output.o railgun_utils.o railgun_client.o railgun_server.o
+objects := railgun_timer.o railgun_output.o ailgun_input.o railgun_sack.o railgun_utils.o railgun_client.o railgun_server.o
 
-object_server := railgun_utils.o railgun_server.o
-object_client := railgun_utils.o railgun_timer.o railgun_output.o railgun_client.o 
+object_server := railgun_utils.o railgun_timer.o railgun_output.o railgun_input.o railgun_sack.o railgun_server.o
+object_client := railgun_utils.o railgun_timer.o railgun_output.o railgun_input.o railgun_client.o 
 
 .PHONY:all
 all:$(TARGET_SERVER) $(TARGET_CLIENT)

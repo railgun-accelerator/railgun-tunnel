@@ -20,12 +20,17 @@ static inline RESP_HEADER* resp_queue_begin() {
 	return list_entry(resp_head.head.prev, RESP_HEADER, head);
 }
 
-static inline RESP_HEADER* resp_queue_add(int ack, struct sockaddr_in* addr_buffer) {
+static inline RESP_HEADER* resp_queue_add_allocate(int ack, int seq, struct sockaddr_in* addr_buffer, int length) {
 	RESP_HEADER* packet = (RESP_HEADER*) malloc(sizeof(RESP_HEADER));
 	bzero(packet, sizeof(RAILGUN_HEADER));
-	packet->response1 = ack;
-	packet->response2 = ack;
+	packet->ack = ack;
+	packet->seq = seq;
 	memcpy(&packet->addr, addr_buffer, sizeof(struct sockaddr_in));
+	_list_add(&packet->head, &resp_head.head);
+	return packet;
+}
+
+static inline RESP_HEADER* resp_queue_add(RESP_HEADER* packet) {
 	_list_add(&packet->head, &resp_head.head);
 	return packet;
 }
