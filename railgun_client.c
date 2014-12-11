@@ -86,7 +86,6 @@ int main(int argc, char** argv) {
 				RESP_HEADER header;
 				bzero(&header, sizeof(RESP_HEADER));
 				railgun_resp_read(g_sock_fd, recvbuf, &header);
-				printf("recv %d from server \n", header.seq);
 				if (header.seq > g_ack) {
 					g_ack = header.seq;
 				}

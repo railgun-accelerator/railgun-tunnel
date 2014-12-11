@@ -12,7 +12,7 @@ RESP_HEADER resp_head;
 SACK_PACKET sack_head;
 
 static u_int32_t g_seq = ISN, g_ack = ISN;
-static BOOL g_timer_counter = 0;
+static BOOL g_timer_counter = FALSE;
 
 static int g_listen_fd = 0, g_kdp_fd = 0;
 
@@ -23,22 +23,11 @@ typedef struct ato_event {
 } ATO_EVENT;
 
 static void ato_handler(int sig, siginfo_t *si, void *uc) {
+	printf("ato triggered. \n");
 	ATO_EVENT* pato_ev;
 	pato_ev = (ATO_EVENT*) si->si_value.sival_ptr;
-	RESP_HEADER* packet = (RESP_HEADER*) malloc(sizeof(RESP_HEADER));
-	bzero(packet, sizeof(RAILGUN_HEADER));
-	packet->ack = g_ack;
-	packet->seq = g_seq;
-	packet->sack_cnt = sack_queue_size();
-	packet->addr_len = pato_ev->addr_len;
-	memcpy(&packet->addr, &pato_ev->addr, packet->addr_len);
-	struct list_head *iter_sack_head = NULL;
-	list_for_each_prev(iter_sack_head, &sack_head.head)
-	{
-		_list_add(iter_sack_head, &packet->sack_head);
-	}
-	resp_queue_add(packet);
-
+	resp_queue_add_allocate(g_ack, g_seq, &pato_ev->addr, pato_ev->addr_len,
+			sack_queue_size(), &sack_head);
 	pato_ev->pev->events = EPOLLIN | EPOLLOUT;
 	int ret = epoll_ctl(g_kdp_fd, EPOLL_CTL_MOD, g_listen_fd, pato_ev->pev);
 	if (ret < 0) {
@@ -128,24 +117,23 @@ int main(int argc, char** argv) {
 						&header);
 				//test if we need to allocate memory for sack in payload first.
 				int seq = ntohl(*(u_int32_t*) recvbuf);
-				if (g_ack == seq) {
-					//do not allocate memory for sack list.
-					railgun_resp_allocate(recvbuf, &header, &payload_offset, 0);
-					g_ack += (read_size - payload_offset);
-					if (!is_sack_queue_empty) {
-						SACK_PACKET* psack = sack_queue_begin();
-						if (psack->left_edge == g_ack) {
-							g_ack = psack->right_edge;
-							sack_queue_delete(psack);
+				if (seq >= g_ack) {
+					if (seq == g_ack) {
+						//do not allocate memory for sack list.
+						railgun_resp_allocate(recvbuf, &header, &payload_offset, 0);
+						g_ack += (read_size - payload_offset);
+						if (!is_sack_queue_empty) {
+							SACK_PACKET* psack = sack_queue_begin();
+							if (psack->left_edge == g_ack) {
+								g_ack = psack->right_edge;
+								sack_queue_delete(psack);
+							}
 						}
-					}
-				} else {
-					//do allocate memory for sack list.
-					railgun_resp_allocate(recvbuf, &header, &payload_offset, 1);
-					SACK_PACKET *psack = NULL, *tmp = NULL;
-					list_for_each_prev_entry_safe(psack, tmp, &(header.sack_head), head)
-					{
-						sack_queue_combine(psack);
+					} else {
+						//do allocate memory for sack list.
+						railgun_resp_allocate(recvbuf, &header, &payload_offset, 1);
+						sack_queue_combine(header.seq,
+								header.seq + read_size - payload_offset);
 					}
 				}
 				if (g_timer_counter == FALSE) {
@@ -170,6 +158,7 @@ int main(int argc, char** argv) {
 					}
 					continue;
 				} else {
+					printf("send response! \n");
 					RESP_HEADER* resp = resp_queue_begin();
 					railgun_resp_send(resp, g_listen_fd, sendbuf);
 					resp_queue_delete(resp);

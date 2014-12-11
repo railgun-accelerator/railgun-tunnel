@@ -18,10 +18,9 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 	memcpy(tmp_buf, &header, 3 * sizeof(u_int32_t));
 	tmp_buf += 3 * sizeof(u_int32_t);
 	if (packet->sack_cnt != 0) {
-		int i = 0;
-		for (; i < packet->sack_cnt; i++) {
-			memcpy(tmp_buf, list_entry(&header.sack_head, SACK_PACKET, head),
-					2 * sizeof(u_int32_t));
+		SACK_PACKET* psack_p = NULL;
+		list_for_each_prev_entry(psack_p, &header.sack_head, head) {
+			memcpy(tmp_buf, psack_p, 2 * sizeof(u_int32_t));
 			nbytes -= 2 * sizeof(u_int32_t);
 			tmp_buf += 2 * sizeof(u_int32_t);
 		}
@@ -63,10 +62,9 @@ void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer) {
 	int sack_cnt = ntohl(pheader->sack_cnt);
 
 	if (sack_cnt != 0) {
-		int i = 0;
-		for (; i < sack_cnt; i++) {
-			memcpy(tmp_buf, list_entry(&pheader->sack_head, SACK_PACKET, head),
-					2 * sizeof(u_int32_t));
+		SACK_PACKET* psack_p = NULL;
+		list_for_each_prev_entry(psack_p, &pheader->sack_head, head) {
+			memcpy(tmp_buf, psack_p, 2 * sizeof(u_int32_t));
 			tmp_buf += 2 * sizeof(u_int32_t);
 		}
 	}

@@ -26,6 +26,8 @@
 
 #include "railgun_typedef.h"
 
+#define MAX_DELIVER_SACK 16
+
 #define MAXBUF 2048
 #define MAXSERVEREPOLLSIZE 100
 #define MAXCLIENTEPOLLSIZE 10

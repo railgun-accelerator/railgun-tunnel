@@ -14,9 +14,12 @@ extern SACK_PACKET sack_head;
 
 #define for_sack_in_queue_safe(s, n) list_for_each_prev_entry_safe(s, n, &sack_head.head, head)
 
-#define is_sack_queue_empty list_empty(&(sack_head.head))
+#define is_sack_queue_empty list_empty(&sack_head.head)
 
-void sack_queue_combine(SACK_PACKET* psack_new);
+/**
+ * sack combine strategy.
+ */
+void sack_queue_combine(int left, int right);
 
 static inline int sack_queue_size() {
 	int i = 0;
@@ -25,6 +28,20 @@ static inline int sack_queue_size() {
 		++i;
 	}
 	return i;
+}
+
+static inline void sack_queue_add(int left, int right) {
+	SACK_PACKET* packet = (SACK_PACKET*)malloc(sizeof(SACK_PACKET));
+	packet->left_edge = left;
+	packet->right_edge = right;
+	_list_add(&packet->head, &sack_head.head);
+}
+
+static inline void sack_queue_add_tail(int left, int right) {
+	SACK_PACKET* packet = (SACK_PACKET*)malloc(sizeof(SACK_PACKET));
+	packet->left_edge = left;
+	packet->right_edge = right;
+	list_add_tail(&packet->head, &sack_head.head);
 }
 
 static inline SACK_PACKET* sack_queue_begin() {
