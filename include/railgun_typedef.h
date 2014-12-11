@@ -9,6 +9,15 @@
 
 #include <railgun_list.h>
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
+#ifndef BOOL
+#define BOOL u_int16_t
+#define FALSE (u_int16_t) 0
+#define TRUE (u_int16_t) 1
+#endif
+
 typedef struct sack_packet {
 	u_int32_t left_edge;
 	u_int32_t right_edge;
@@ -16,6 +25,8 @@ typedef struct sack_packet {
 } SACK_PACKET;
 
 typedef struct railgun_header {
+	struct sockaddr_in addr;
+	size_t addr_len;
 	list_head head;
 	u_int64_t timestamp;
 	u_int16_t src;
@@ -27,6 +38,7 @@ typedef struct railgun_header {
 #define railgun_data __src_represent._data
 	u_int32_t seq;
 	u_int32_t ack;
+	u_int32_t win;
 	u_int32_t sack_cnt;
 	list_head sack_head;
 } RAILGUN_HEADER;
@@ -34,6 +46,7 @@ typedef struct railgun_header {
 typedef struct payload_header {
 	u_int32_t seq;
 	u_int32_t ack;
+	u_int32_t win;
 	u_int32_t sack_cnt;
 	list_head sack_head;
 } PAYLOAD_HEADER;

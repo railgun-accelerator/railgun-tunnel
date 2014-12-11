@@ -7,7 +7,7 @@
 
 #include <railgun_utils.h>
 
-int railgun_packet_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader) {
+int railgun_packet_read(int fd, u_int8_t *buffer, RAILGUN_HEADER *pheader) {
 	int nbytes = 0;
 	while (nbytes < MTU) {
 		int read_cnt = recvfrom(fd, buffer, MTU, 0,
@@ -18,6 +18,46 @@ int railgun_packet_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader) {
 			}
 		}
 		nbytes += read_cnt;
+	}
+	return nbytes;
+}
+
+int railgun_tcp_read(int fd, u_int8_t *buffer, int start_pos,
+		int *pmax_avail_size) {
+	int nbytes = 0, read_cnt = 0;
+	while (nbytes <= *pmax_avail_size) {
+		read_cnt = read(fd, buffer + start_pos + nbytes, *pmax_avail_size);
+		if (read_cnt < 0) {
+			if (errno != EAGAIN) {
+				perror("read error");
+			}
+			break;
+		}
+		nbytes += read_cnt;
+	}
+	*pmax_avail_size = nbytes;
+	if (read_cnt < 0) {
+		nbytes = read_cnt;
+	}
+	return nbytes;
+}
+
+int railgun_tcp_write(int fd, u_int8_t *buffer, int start_pos,
+		int *pmax_avail_size) {
+	int nbytes = 0, write_cnt = 0;
+	while (nbytes <= *pmax_avail_size) {
+		write_cnt = write(fd, buffer + start_pos + nbytes, *pmax_avail_size);
+		if (write_cnt < 0) {
+			if (errno != EAGAIN) {
+				perror("read error");
+			}
+			break;
+		}
+		nbytes += write_cnt;
+	}
+	*pmax_avail_size = nbytes;
+	if (write_cnt < 0) {
+		nbytes = write_cnt;
 	}
 	return nbytes;
 }

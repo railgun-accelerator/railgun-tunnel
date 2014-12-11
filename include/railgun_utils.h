@@ -16,6 +16,50 @@ extern int map_from_file(const char* filename, void ** pdata_buffer,
 
 extern void unmap_from_file(int fd, void* data_buffer, int length);
 
+static inline void epoll_init_watch(int epoll_fd, int target_fd, struct epoll_event *cur_pev, int flag) {
+	cur_pev->data.fd = target_fd;
+	cur_pev->events = flag;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, target_fd, cur_pev) < 0) {
+		perror("epoll_init_watch failed");
+	}
+}
+
+static inline void epoll_add_watch(int epoll_fd, int target_fd,
+		struct epoll_event *cur_pev, int flag) {
+	if (cur_pev->data.fd == target_fd && (cur_pev->events & flag)) {
+		//already has read watched;
+		return;
+	}
+	cur_pev->data.fd = target_fd;
+	if (cur_pev->events) {
+		cur_pev->events |= flag;
+		if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, target_fd, cur_pev)) {
+			perror("epoll_add_watch failed");
+		}
+	} else {
+		cur_pev->events = flag;
+		if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, target_fd, cur_pev)) {
+			perror("epoll_add_watch failed");
+		}
+	}
+}
+
+static inline void epoll_remove_watch(int epoll_fd, int target_fd,
+		struct epoll_event *cur_pev, int flag) {
+	if (cur_pev->data.fd == target_fd && (cur_pev->events & flag)) {
+		cur_pev->events &= !flag;
+		if (cur_pev->events) {
+			if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, target_fd, cur_pev)) {
+				perror("epoll_remove_watch failed");
+			}
+		} else {
+			if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, target_fd, NULL)) {
+				perror("epoll_remove_watch failed");
+			}
+		}
+	}
+}
+
 static inline void payload_htonl(PAYLOAD_HEADER* ppayload) {
 	ppayload->seq = htonl(ppayload->seq);
 	ppayload->ack = htonl(ppayload->ack);
@@ -60,9 +104,8 @@ static inline PAYLOAD_HEADER* railgun_resp_header(RESP_HEADER* rp) {
 	return (PAYLOAD_HEADER*) &rp->seq;
 }
 
-static inline u_int64_t get_current_time_in_millis() {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
+static inline u_int64_t get_current_time_in_millis(struct timeval *ptv) {
+	gettimeofday(ptv, NULL);
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 

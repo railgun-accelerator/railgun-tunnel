@@ -25,8 +25,11 @@
 #include <time.h>
 
 #include "railgun_typedef.h"
+#include "railgun_log.h"
 
 #define MAX_DELIVER_SACK 16
+
+#define BUFFER (u_int32_t)1024 * 1024 * 10
 
 #define MAXBUF 2048
 #define MAXSERVEREPOLLSIZE 100
@@ -42,15 +45,6 @@
 
 #define ISN (u_int8_t)0
 
-#define likely(x)       __builtin_expect((x),1)
-#define unlikely(x)     __builtin_expect((x),0)
-
-#ifndef BOOL
-#define BOOL u_int16_t
-#define FALSE (u_int16_t) 0
-#define TRUE (u_int16_t) 1
-#endif
-
 extern void railgun_timer_delete();
 
 extern void railgun_timer_cancel();
@@ -63,7 +57,9 @@ extern void railgun_timer_init(
 extern int railgun_packet_write(RAILGUN_HEADER* packet, int fd,
 		u_int8_t *buffer, u_int8_t *payload, int *plength);
 
-extern int railgun_packet_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader);
+extern int railgun_tcp_read(int fd, u_int8_t *buffer, int start_pos, int *pmax_avail_size);
+
+extern int railgun_packet_read(int fd, u_int8_t *buffer, RAILGUN_HEADER *pheader);
 
 extern void railgun_resp_allocate(u_int8_t *buffer, RESP_HEADER *pheader,
 		int *payload_pos, int ack_allocated);
