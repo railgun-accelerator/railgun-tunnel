@@ -19,7 +19,8 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 	tmp_buf += 3 * sizeof(u_int32_t);
 	if (packet->sack_cnt != 0) {
 		SACK_PACKET* psack_p = NULL;
-		list_for_each_prev_entry(psack_p, &header.sack_head, head) {
+		list_for_each_prev_entry(psack_p, &header.sack_head, head)
+		{
 			memcpy(tmp_buf, psack_p, 2 * sizeof(u_int32_t));
 			nbytes -= 2 * sizeof(u_int32_t);
 			tmp_buf += 2 * sizeof(u_int32_t);
@@ -63,7 +64,8 @@ void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer) {
 
 	if (sack_cnt != 0) {
 		SACK_PACKET* psack_p = NULL;
-		list_for_each_prev_entry(psack_p, &pheader->sack_head, head) {
+		list_for_each_prev_entry(psack_p, &pheader->sack_head, head)
+		{
 			memcpy(tmp_buf, psack_p, 2 * sizeof(u_int32_t));
 			tmp_buf += 2 * sizeof(u_int32_t);
 		}
@@ -76,7 +78,8 @@ void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer) {
 			perror("write error");
 		}
 	}
-	printf("send %d to %s:%d, ack = %d  \n", write_cnt, inet_ntoa(resp->addr.sin_addr),
-			ntohs(resp->addr.sin_port), ntohl(resp->ack));
+	printf("send %d to %s:%d, ack = %d  \n", write_cnt,
+			inet_ntoa(resp->addr.sin_addr), ntohs(resp->addr.sin_port),
+			ntohl(resp->ack));
 }
 

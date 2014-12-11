@@ -65,7 +65,8 @@ int railgun_resp_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader) {
 	pheader->sack_cnt = sack_cnt = ntohl(*(u_int32_t*) &buffer[pos]);
 	pos += 4;
 	INIT_LIST_HEAD(&pheader->sack_head);
-	printf("receive %d from server, ack = %d, seq = %d,  sack_cnt = %d \n", read_cnt, pheader->ack, pheader->seq, sack_cnt);
+	printf("receive %d from server, ack = %d, seq = %d,  sack_cnt = %d \n",
+			read_cnt, pheader->ack, pheader->seq, sack_cnt);
 	if (sack_cnt != 0) {
 		for (i = 0; i < pheader->sack_cnt; i++) {
 			SACK_PACKET* sp = (SACK_PACKET*) malloc(sizeof(SACK_PACKET));
@@ -74,7 +75,8 @@ int railgun_resp_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader) {
 			sp->right_edge = ntohl(*(u_int32_t*) &buffer[pos]);
 			pos += 4;
 			_list_add(&sp->head, &pheader->sack_head);
-			printf("receive sack_%d, left = %d, right = %d \n", i, sp->left_edge, sp->right_edge);
+			printf("receive sack_%d, left = %d, right = %d \n", i,
+					sp->left_edge, sp->right_edge);
 		}
 	}
 	return read_cnt;

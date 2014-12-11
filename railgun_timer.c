@@ -20,7 +20,8 @@ void railgun_timer_delete() {
 	}
 }
 
-void railgun_timer_init(void (*timer_handler)(int sig, siginfo_t *si, void *uc), void* param) {
+void railgun_timer_init(void (*timer_handler)(int sig, siginfo_t *si, void *uc),
+		void* param) {
 	railgun_timer_delete();
 	struct sigevent ev;
 	struct sigaction act;

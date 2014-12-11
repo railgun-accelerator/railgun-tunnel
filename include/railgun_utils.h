@@ -22,7 +22,8 @@ static inline void payload_htonl(PAYLOAD_HEADER* ppayload) {
 	int sc = ppayload->sack_cnt;
 	if (sc != 0) {
 		SACK_PACKET* sack = NULL;
-		list_for_each_prev_entry(sack, &ppayload->sack_head, head) {
+		list_for_each_prev_entry(sack, &ppayload->sack_head, head)
+		{
 			sack->left_edge = htonl(sack->left_edge);
 			sack->right_edge = htonl(sack->right_edge);
 		}
@@ -36,7 +37,8 @@ static inline void payload_ntohl(PAYLOAD_HEADER* ppayload) {
 	int sc = ppayload->sack_cnt;
 	if (sc != 0) {
 		SACK_PACKET* sack = NULL;
-		list_for_each_prev_entry(sack, &ppayload->sack_head, head) {
+		list_for_each_prev_entry(sack, &ppayload->sack_head, head)
+		{
 			sack->left_edge = ntohl(sack->left_edge);
 			sack->right_edge = ntohl(sack->right_edge);
 		}
@@ -72,8 +74,8 @@ static inline void print_readable_time(FILE* fd) {
 	gettimeofday(&tv, NULL);
 	nowtime = tv.tv_sec;
 	nowtm = localtime(&nowtime);
-	size_t index = strftime(buf, (size_t)64, "%Y-%m-%d %H:%M:%S", nowtm);
-	snprintf(&buf[index], (size_t)(64 - index), ".%06ld \n", tv.tv_usec);
+	size_t index = strftime(buf, (size_t) 64, "%Y-%m-%d %H:%M:%S", nowtm);
+	snprintf(&buf[index], (size_t) (64 - index), ".%06ld \n", tv.tv_usec);
 	fprintf(fd, "%s", buf);
 }
 #endif /*RAILGUN_UTILS_H_*/

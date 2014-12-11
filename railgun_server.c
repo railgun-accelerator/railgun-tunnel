@@ -120,7 +120,8 @@ int main(int argc, char** argv) {
 				if (seq >= g_ack) {
 					if (seq == g_ack) {
 						//do not allocate memory for sack list.
-						railgun_resp_allocate(recvbuf, &header, &payload_offset, 0);
+						railgun_resp_allocate(recvbuf, &header, &payload_offset,
+								0);
 						g_ack += (read_size - payload_offset);
 						if (!is_sack_queue_empty) {
 							SACK_PACKET* psack = sack_queue_begin();
@@ -131,7 +132,8 @@ int main(int argc, char** argv) {
 						}
 					} else {
 						//do allocate memory for sack list.
-						railgun_resp_allocate(recvbuf, &header, &payload_offset, 1);
+						railgun_resp_allocate(recvbuf, &header, &payload_offset,
+								1);
 						sack_queue_combine(header.seq,
 								header.seq + read_size - payload_offset);
 					}

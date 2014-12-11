@@ -99,7 +99,8 @@ int main(int argc, char** argv) {
 					}
 				}
 				RAILGUN_HEADER * pos = packet;
-				SACK_PACKET* psack = NULL, *sack_tmp = NULL;
+				SACK_PACKET* psack = NULL,
+				*sack_tmp = NULL;
 				list_for_each_prev_entry(psack, &header.sack_head, head)
 				{
 					for_packet_in_payload_queue(packet, tmp)
@@ -116,7 +117,8 @@ int main(int argc, char** argv) {
 					}
 				}
 				//release sack list in response.
-				list_for_each_prev_entry_safe(psack, sack_tmp, &header.sack_head, head) {
+				list_for_each_prev_entry_safe(psack, sack_tmp, &header.sack_head, head)
+				{
 					list_del(&psack->head);
 					free(psack);
 				}

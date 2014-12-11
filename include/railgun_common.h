@@ -57,14 +57,16 @@ extern void railgun_timer_cancel();
 
 extern void railgun_timer_set(int time_in_ms);
 
-extern void railgun_timer_init(void (*timer_handler)(int sig, siginfo_t *si, void *uc), void* param);
+extern void railgun_timer_init(
+		void (*timer_handler)(int sig, siginfo_t *si, void *uc), void* param);
 
-extern int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
-		u_int8_t *payload, int *plength);
+extern int railgun_packet_write(RAILGUN_HEADER* packet, int fd,
+		u_int8_t *buffer, u_int8_t *payload, int *plength);
 
 extern int railgun_packet_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader);
 
-extern void railgun_resp_allocate(u_int8_t *buffer, RESP_HEADER *pheader, int *payload_pos, int ack_allocated);
+extern void railgun_resp_allocate(u_int8_t *buffer, RESP_HEADER *pheader,
+		int *payload_pos, int ack_allocated);
 
 extern void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer);
 

@@ -24,21 +24,22 @@ void sack_queue_combine(int left, int right);
 static inline int sack_queue_size() {
 	int i = 0;
 	struct list_head* phead;
-	list_for_each_prev(phead, &sack_head.head) {
+	list_for_each_prev(phead, &sack_head.head)
+	{
 		++i;
 	}
 	return i;
 }
 
 static inline void sack_queue_add(int left, int right) {
-	SACK_PACKET* packet = (SACK_PACKET*)malloc(sizeof(SACK_PACKET));
+	SACK_PACKET* packet = (SACK_PACKET*) malloc(sizeof(SACK_PACKET));
 	packet->left_edge = left;
 	packet->right_edge = right;
 	_list_add(&packet->head, &sack_head.head);
 }
 
 static inline void sack_queue_add_tail(int left, int right) {
-	SACK_PACKET* packet = (SACK_PACKET*)malloc(sizeof(SACK_PACKET));
+	SACK_PACKET* packet = (SACK_PACKET*) malloc(sizeof(SACK_PACKET));
 	packet->left_edge = left;
 	packet->right_edge = right;
 	list_add_tail(&packet->head, &sack_head.head);
