@@ -7,35 +7,30 @@
 
 #include <railgun_utils.h>
 
-int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
-		u_int8_t *payload, int *plength) {
+int railgun_udp_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
+		u_int8_t *payload) {
 	PAYLOAD_HEADER header;
 	u_int8_t* tmp_buf = buffer;
-	int nbytes = MTU - 3 * sizeof(u_int32_t);
+	int nbytes = 0;
 	memcpy(&header, railgun_payload_header(packet), sizeof(PAYLOAD_HEADER));
 	payload_htonl(&header);
 	bzero(buffer, MAXBUF);
-	memcpy(tmp_buf, &header, 3 * sizeof(u_int32_t));
-	tmp_buf += 3 * sizeof(u_int32_t);
+	memcpy(tmp_buf, &header, 4 * sizeof(u_int32_t));
+	tmp_buf += 4 * sizeof(u_int32_t);
 	if (packet->sack_cnt != 0) {
 		SACK_PACKET* psack_p = NULL;
 		list_for_each_prev_entry(psack_p, &header.sack_head, head)
 		{
 			memcpy(tmp_buf, psack_p, 2 * sizeof(u_int32_t));
-			nbytes -= 2 * sizeof(u_int32_t);
 			tmp_buf += 2 * sizeof(u_int32_t);
 		}
 	}
-	if (plength != NULL) {
-		*plength = nbytes;
-	}
 	//if src represent is 0, just use payload as data source, otherwise use data
 	if (packet->src == 0) {
-		memcpy(tmp_buf, payload, nbytes);
+		memcpy(tmp_buf, payload, packet->railgun_data_length);
 	} else {
-		memcpy(tmp_buf, packet->railgun_data, nbytes);
+		memcpy(tmp_buf, packet->railgun_data, packet->railgun_data_length);
 	}
-	nbytes = 0;
 	while (nbytes < MTU) {
 		int write_cnt = write(fd, buffer, MTU);
 		if (write_cnt < 0) {
@@ -46,7 +41,7 @@ int railgun_packet_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
 		}
 		nbytes += write_cnt;
 	}
-	printf("send %d to server, seq = %d  \n", nbytes, packet->seq);
+	printf("send out %d , seq = %d  \n", nbytes, packet->seq);
 	return nbytes;
 }
 

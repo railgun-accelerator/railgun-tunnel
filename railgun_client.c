@@ -272,25 +272,27 @@ int main(int argc, char** argv) {
 						SACK_PACKET *sack_iterp, sack_p;
 						packet->ack = g_ack;
 						packet->win = g_rcv_buf_offset + BUFFER - g_ack;
-						packet->sack_cnt =
-								sack_queue_size() > packet->sack_cnt ?
-										packet->sack_cnt : sack_queue_size();
-						if (packet->sack_cnt != 0) {
-							sack_p = (SACK_PACKET*) calloc(packet->sack_cnt,
+						int cur_sack_size = sack_queue_size();
+						if (cur_sack_size < packet->sack_cnt) {
+							packet->sack_cnt = cur_sack_size;
+						}
+						cur_sack_size = packet->sack_cnt;
+						if (cur_sack_size != 0) {
+							sack_p = (SACK_PACKET*) calloc(cur_sack_size,
 									sizeof(SACK_PACKET));
 						}
 						int i = 0;
 						for_sack_in_queue(sack_iterp)
 						{
-							if (i >= packet->sack_cnt) {
+							if (i >= cur_sack_size) {
 								break;
 							}
 							memcpy(&sack_p[i], iter_sack, sizeof(SACK_PACKET));
 							_list_add(&(&sack_p[i++])->head,
 									&packet->sack_head);
 						}
-						railgun_packet_write(packet, g_udp_sock_fd, sendbuf,
-								data_buffer, NULL);
+						railgun_udp_write(packet, g_udp_sock_fd, sendbuf,
+								g_send_buffer);
 						packet->timestamp = get_current_time_in_millis(&tv);
 						is_packet_send = TRUE;
 						break;
