@@ -14,6 +14,8 @@ extern SACK_PACKET sack_head;
 
 #define for_sack_in_queue_safe(s, n) list_for_each_prev_entry_safe(s, n, &sack_head.head, head)
 
+#define for_sack_in_queue(s) list_for_each_prev_entry(s, &sack_head.head, head)
+
 #define is_sack_queue_empty list_empty(&sack_head.head)
 
 /**

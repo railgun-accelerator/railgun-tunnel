@@ -11,7 +11,9 @@
 
 extern RAILGUN_HEADER payload_head;
 
-#define for_packet_in_payload_queue(s, n) list_for_each_prev_entry_safe(s, n, &payload_head.head, head)
+#define for_packet_in_payload_queue_safe(s, n) list_for_each_prev_entry_safe(s, n, &payload_head.head, head)
+
+#define for_packet_in_payload_queue(s) list_for_each_prev_entry(s, &payload_head.head, head)
 
 #define is_payload_queue_empty list_empty(&(payload_head.head))
 

@@ -31,11 +31,12 @@ typedef struct railgun_header {
 	u_int64_t timestamp;
 	u_int16_t src;
 	union {
-		u_int64_t _data_offset;
+		u_int32_t _data_offset;
 		void* _data;
 	} __src_represent;
 #define railgun_data_offset __src_represent._data_offset
 #define railgun_data __src_represent._data
+	u_int32_t railgun_data_length;
 	u_int32_t seq;
 	u_int32_t ack;
 	u_int32_t win;

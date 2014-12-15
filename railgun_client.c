@@ -7,6 +7,8 @@
 #include <railgun_common.h>
 #include <railgun_utils.h>
 
+#include <railgun_sack.h>
+
 #include <railgun_payload_queue.h>
 
 RAILGUN_HEADER payload_head;
@@ -116,8 +118,9 @@ int main(int argc, char** argv) {
 					&& (events[i].events & EPOLLIN)) {
 				//tcp read
 				u_int32_t read_size = g_sd_buf_offset + BUFFER - g_ready;
-				railgun_tcp_read(g_tcp_sock_fd, g_send_buffer, g_ready,
-						&read_size);
+				//FIXME: send buffer can be handled more elegantly.
+				railgun_tcp_read(g_tcp_sock_fd, g_send_buffer,
+						g_ready - g_sd_buf_offset, &read_size);
 				g_ready += read_size;
 				if (g_ready == g_sd_buf_offset + BUFFER) {
 					epoll_remove_watch(g_kdp_fd, g_tcp_sock_fd, &tcp_ev,
@@ -149,37 +152,35 @@ int main(int argc, char** argv) {
 				}
 			} else if (events[n].data.fd == g_udp_sock_fd
 					&& (events[i].events & EPOLLIN)) {
+				u_int32_t payload_offset = 0;
+				u_int32_t read_cnt = 0;
 				//udp read
-				railgun_packet_read(g_udp_sock_fd, recvbuf, &railgun_header);
-				int ack = ntohl(*(u_int32_t*) &recvbuf[4]);
-				int win = ntohl(*(u_int32_t*) &recvbuf[8]);
-				if (ack + win > g_window) {
-					window = ack + win;
+				read_cnt = railgun_udp_read(g_udp_sock_fd, recvbuf,
+						&railgun_header, &payload_offset);
+				if (railgun_header.ack + railgun_header.win > g_window) {
+					window = railgun_header.ack + railgun_header.win;
 				}
-				if (ack == g_window) {
+				if (railgun_header.ack == g_window) {
 					g_zero_win_probe_time = get_current_time_in_millis(*tv);
-					if (ack > g_sd_buf_offset) {
-						g_zero_win_probe_content = g_send_buffer[ack
-								- g_sd_buf_offset - 1];
+					if (railgun_header.ack > g_sd_buf_offset) {
+						g_zero_win_probe_content =
+								g_send_buffer[railgun_header.ack
+										- g_sd_buf_offset - 1];
 					}
 					if (g_timer_counter == TRUE) {
 						railgun_timer_delete();
 						g_timer_counter = FALSE;
 						epoll_add_watch(g_kdp_fd, g_udp_sock_fd, &udp_ev,
-								EPOLLOUT);
+						EPOLLOUT);
 					}
 				} else {
 					g_zero_win_probe_time = 0;
 				}
-
-				RESP_HEADER header;
-				bzero(&header, sizeof(RESP_HEADER));
-				railgun_resp_read(g_udp_sock_fd, recvbuf, &header);
-				if (header.seq > g_ack) {
-					g_ack = header.seq;
+				if (railgun_header.seq > g_ack) {
+					g_ack = railgun_header.seq;
 				}
 				RAILGUN_HEADER *packet = NULL, *tmp = NULL;
-				for_packet_in_payload_queue(packet, tmp)
+				for_packet_in_payload_queue_safe(packet, tmp)
 				{
 					if (packet->seq < g_ack) {
 						payload_queue_delete(packet);
@@ -190,9 +191,9 @@ int main(int argc, char** argv) {
 				RAILGUN_HEADER * pos = packet;
 				SACK_PACKET* psack = NULL,
 				*sack_tmp = NULL;
-				list_for_each_prev_entry(psack, &header.sack_head, head)
+				list_for_each_prev_entry(psack, &railgun_header.sack_head, head)
 				{
-					for_packet_in_payload_queue(packet, tmp)
+					for_packet_in_payload_queue_safe(packet, tmp)
 					{
 						if (packet != pos) {
 							continue;
@@ -206,21 +207,88 @@ int main(int argc, char** argv) {
 					}
 				}
 				//release sack list in response.
-				list_for_each_prev_entry_safe(psack, sack_tmp, &header.sack_head, head)
+				list_for_each_prev_entry_safe(psack, sack_tmp, &railgun_header.sack_head, head)
 				{
 					list_del(&psack->head);
 					free(psack);
+				}
+				if (railgun_header.ack > g_sd_buf_offset) {
+					//FIXME: we need to copy any content?
+					if (g_sd_buf_offset + BUFFER == g_ready) {
+						epoll_add_watch(g_kdp_fd, g_tdp_sock_fd, &tcp_ev,
+						EPOLLIN);
+					}
+					g_sd_buf_offset = railgun_header.ack;
+				}
+				//if we have payload.
+				if (read_cnt > payload_offset) {
+					if (railgun_header.seq >= g_rcv_buf_offset) {
+						memcpy(
+								g_recv_buffer + railgun_header.seq
+										- g_rcv_buf_offset,
+								recvbuf[payload_offset],
+								read_cnt - payload_offset);
+						if (railgun_header.seq >= g_ack) {
+							if (railgun_header.seq == g_ack) {
+								if (g_rcv_buf_offset == g_ack) {
+									epoll_add_watch(g_kdp_fd, g_tcp_sock_fd,
+											&tcp_ev, EPOLLOUT);
+								}
+								g_ack += (read_cnt - payload_offset);
+								if (!is_sack_queue_empty) {
+									SACK_PACKET* psack = sack_queue_begin();
+									if (psack->left_edge == g_ack) {
+										g_ack = psack->right_edge;
+										sack_queue_delete(psack);
+									}
+								}
+							} else {
+								sack_queue_combine(railgun_header.seq,
+										railgun_header.seq + read_cnt
+												- payload_offset);
+							}
+						}
+					}
+					if (g_delay_ack_time == 0) {
+						g_delay_ack_time = get_current_time_in_millis(&tv);
+					}
+					if (g_timer_counter == TRUE) {
+						railgun_timer_delete();
+						g_timer_counter = FALSE;
+						epoll_add_watch(g_kdp_fd, g_udp_sock_fd, &udp_ev,
+						EPOLLOUT);
+					}
 				}
 			} else if (events[n].data.fd == g_udp_sock_fd
 					&& (events[i].events & EPOLLOUT)) {
 				//udp write
 				BOOL is_packet_send = FALSE;
 				current_time_in_millis = get_current_time_in_millis(&tv);
-				RAILGUN_HEADER *packet = NULL, *tmp = NULL;
-				for_packet_in_payload_queue(packet, tmp)
+				RAILGUN_HEADER *packet = NULL;
+				for_packet_in_payload_queue(packet)
 				{
 					if (packet->timestamp + (u_int64_t) RTO
 							<= current_time_in_millis) {
+						SACK_PACKET *sack_iterp, sack_p;
+						packet->ack = g_ack;
+						packet->win = g_rcv_buf_offset + BUFFER - g_ack;
+						packet->sack_cnt =
+								sack_queue_size() > packet->sack_cnt ?
+										packet->sack_cnt : sack_queue_size();
+						if (packet->sack_cnt != 0) {
+							sack_p = (SACK_PACKET*) calloc(packet->sack_cnt,
+									sizeof(SACK_PACKET));
+						}
+						int i = 0;
+						for_sack_in_queue(sack_iterp)
+						{
+							if (i >= packet->sack_cnt) {
+								break;
+							}
+							memcpy(&sack_p[i], iter_sack, sizeof(SACK_PACKET));
+							_list_add(&(&sack_p[i++])->head,
+									&packet->sack_head);
+						}
 						railgun_packet_write(packet, g_udp_sock_fd, sendbuf,
 								data_buffer, NULL);
 						packet->timestamp = get_current_time_in_millis(&tv);
