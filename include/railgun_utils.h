@@ -94,6 +94,10 @@ static inline int before(u_int32_t seq1, u_int32_t seq2) {
 	return (int32_t) (seq1 - seq2);
 }
 
+static inline int min(u_int32_t seq1, u_int32_t seq2) {
+	return seq1 > seq2 ? seq2 : seq1;
+}
+
 #define after(seq2, seq1) before(seq1, seq2);
 
 static inline PAYLOAD_HEADER* railgun_payload_header(RAILGUN_HEADER* rp) {

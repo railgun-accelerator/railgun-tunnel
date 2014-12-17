@@ -36,7 +36,7 @@ static void retransmission_handler(int sig, siginfo_t *si, void *uc) {
 int main(int argc, char** argv) {
 	struct sockaddr_in listenaddr, conaddr;
 	void *data_buffer;
-	int i = 0, nfds = 0, data_read_size = 0;
+	int i = 0, nfds = 0, udp_write_size = 0;
 	int data_fd = 0, tcp_server_fd = 0;
 	u_int64_t filelength = 0;
 	u_int16_t servport, conport;
@@ -293,41 +293,35 @@ int main(int argc, char** argv) {
 						}
 						railgun_udp_write(packet, g_udp_sock_fd, sendbuf,
 								g_send_buffer);
-						packet->timestamp = get_current_time_in_millis(&tv);
 						is_packet_send = TRUE;
+						packet->timestamp = get_current_time_in_millis(&tv);
+						payload_queue_move_tail(packet);
+						g_zero_win_probe_time = 0;
 						break;
 					}
 				}
 				if (!is_packet_send) {
-					if (data_read_size + MTU <= filelength) {
-						int packet_skip_size = 0;
-						RAILGUN_HEADER* pay_load = payload_queue_add(g_seq,
-								g_ack, data_read_size,
-								get_current_time_in_millis(&tv));
+					//send data
+					if (min(g_window, g_ready) - g_seq > 0) {
+						RAILGUN_HEADER* pay_load = payload_queue_add_allocate(
+								g_seq, g_ack, g_rcv_buf_offset + BUFFER - g_ack,
+								g_seq, get_current_time_in_millis(&tv),
+								sack_queue_size(), &sack_head);
 						printf("add %d to table \n", pay_load->seq);
-						railgun_packet_write(pay_load, g_udp_sock_fd, sendbuf,
-								data_buffer, &packet_skip_size);
-						data_read_size += packet_skip_size;
-						g_seq += packet_skip_size;
-					} else {
-						if (is_payload_queue_empty) {
-							printf("done. \n");
-							railgun_timer_delete();
-							goto error;
-						} else {
-							ev.events = EPOLLIN;
-							int ret = epoll_ctl(g_kdp_fd, EPOLL_CTL_MOD,
-									g_udp_sock_fd, &ev);
-							if (ret < 0) {
-								perror("epoll_ctl remove output watch failed");
-							}
-							printf("set timer for %d \n",
-									payload_queue_begin()->seq);
-							railgun_timer_set(
-									RTO
-											- (get_current_time_in_millis()
-													- payload_queue_begin()->timestamp));
-						}
+						udp_write_size = railgun_udp_write(pay_load,
+								g_udp_sock_fd, sendbuf, g_send_buffer);
+						//FIXME: what to do if we write failed.
+						g_seq += (
+								udp_write_size > pay_load->railgun_data_length ?
+										pay_load->railgun_data_length : 0);
+					}
+					//zero window probe
+					if (g_zero_win_probe_time + RTO
+							<= get_current_time_in_millis(&tv)) {
+						RAILGUN_HEADER* zero_win_probe = payload_queue_add_allocate(
+								g_sd_buf_offset, g_ack, g_rcv_buf_offset + BUFFER - g_ack,
+								g_seq, get_current_time_in_millis(&tv),
+								sack_queue_size(), &sack_head);
 					}
 				}
 			}
