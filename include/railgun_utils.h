@@ -110,7 +110,7 @@ static inline PAYLOAD_HEADER* railgun_resp_header(RESP_HEADER* rp) {
 
 static inline u_int64_t get_current_time_in_millis(struct timeval *ptv) {
 	gettimeofday(ptv, NULL);
-	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+	return ptv->tv_sec * 1000 + ptv->tv_usec / 1000;
 }
 
 static inline void print_readable_time(FILE* fd) {

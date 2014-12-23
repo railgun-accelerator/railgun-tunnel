@@ -54,18 +54,16 @@ extern void railgun_timer_set(int time_in_ms);
 extern void railgun_timer_init(
 		void (*timer_handler)(int sig, siginfo_t *si, void *uc), void* param);
 
-extern int railgun_udp_write(RAILGUN_HEADER* packet, int fd,
-		u_int8_t *buffer, u_int8_t *payload, int *plength);
+extern int railgun_tcp_write(int fd, u_int8_t *buffer, int start_pos,
+		int *pmax_avail_size);
 
-extern int railgun_tcp_read(int fd, u_int8_t *buffer, int start_pos, int *pmax_avail_size);
+extern int railgun_udp_write(RAILGUN_HEADER* packet, int fd, u_int8_t *buffer,
+		u_int8_t *payload);
 
-extern int railgun_udp_read(int fd, u_int8_t *buffer, RAILGUN_HEADER *pheader);
+extern int railgun_tcp_read(int fd, u_int8_t *buffer, int start_pos,
+		int *pmax_avail_size);
 
-extern void railgun_resp_allocate(u_int8_t *buffer, RESP_HEADER *pheader,
-		int *payload_pos, int ack_allocated);
-
-extern void railgun_resp_send(RESP_HEADER* resp, int fd, u_int8_t *buffer);
-
-extern int railgun_resp_read(int fd, u_int8_t *buffer, RESP_HEADER *pheader);
+extern int railgun_udp_read(int fd, u_int8_t *buffer, RAILGUN_HEADER *pheader,
+		int *payload_pos);
 
 #endif /*RAILGUN_COMMON_H_*/

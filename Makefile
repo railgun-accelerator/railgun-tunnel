@@ -1,6 +1,5 @@
 CC = gcc
-TARGET_SERVER = railgun_server
-TARGET_CLIENT = railgun_client
+TARGET_CORE = railgun_core
 
 INCLUDE := -I./include
 CFLAGS := -Wall $(INCLUDE)
@@ -21,18 +20,12 @@ else
     endif
 endif
 
-objects := railgun_timer.o railgun_output.o railgun_input.o railgun_sack.o railgun_utils.o railgun_client.o railgun_server.o
-
-object_server := railgun_utils.o railgun_timer.o railgun_output.o railgun_input.o railgun_sack.o railgun_server.o
-object_client := railgun_utils.o railgun_timer.o railgun_output.o railgun_input.o railgun_client.o 
+objects := railgun_timer.o railgun_output.o railgun_input.o railgun_sack.o railgun_utils.o railgun_core.o
 
 .PHONY:all
-all:$(TARGET_SERVER) $(TARGET_CLIENT)
+all:$(TARGET_CORE)
 
-$(TARGET_SERVER):$(object_server)
-	$(CC) $? -o $@ $(CFLAGS) $(LDFLAGS)
-	
-$(TARGET_CLIENT):$(object_client)
+$(TARGET_CORE):$(objects)
 	$(CC) $? -o $@ $(CFLAGS) $(LDFLAGS)
 	
 $(objects): %.o: %.c
