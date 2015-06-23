@@ -1,0 +1,3 @@
+[submodule "shorthair"]
+	path = shorthair
+	url = https://github.com/catid/shorthair.git
