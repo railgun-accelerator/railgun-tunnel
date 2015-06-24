@@ -30,13 +30,16 @@ static void *inbound_loop(void *tunnel_void){
             }
             setsockopt(tunnel->socket_fd, SOL_SOCKET,SO_RCVTIMEO, &timeout, sizeof(timeout));
             //cout << "sleep" << timeout.tv_sec << "." << timeout.tv_usec << endl;
-        }else if(errno == EAGAIN){
+        }else if(errno == EAGAIN) {
             //cout << "tick" << endl;
             tunnel->codec.Tick();
             gettimeofday(&last_tick, NULL);
             timeout.tv_usec = TICK;
-            setsockopt(tunnel->socket_fd, SOL_SOCKET,SO_RCVTIMEO, &timeout, sizeof(timeout));
+            setsockopt(tunnel->socket_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        }else if(errno == ECONNREFUSED){
+            //do nothing
         }else{
+            cout << errno << endl;
             perror("inbound loop recv");
             break;
         }
